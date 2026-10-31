@@ -1,22 +1,28 @@
 # SANRO POS Tunas Baru — Android TESTING Build
 
-**PUBLIC BUILD WORKSPACE — NOT THE APPLICATION SOURCE REPOSITORY**
+**Public Android build workspace only. Not the SANRO POS application repository.**
 
-Repository khusus untuk membangun dan menguji APK Android **SANRO POS Tunas Baru TESTING** setelah source Android yang akan dipublikasikan diaudit dan disetujui Owner.
+This repository contains **only** the reviewed Android TESTING project required to build a non-production APK. The original application repository `arioguswara-oss/Sanro-Pos-TunasBaru` remains **PRIVATE**.
 
-## Boundary
+## Provenance and limits
 
-- Private application source: `arioguswara-oss/Sanro-Pos-TunasBaru` (must remain PRIVATE).
-- This repository must **not** include the private frontend/backend application, database, SSH keys, Android signing keys, credentials, backups, or production configuration.
-- Not related to SANRO POS Public and must not deploy to any production system.
-- Never deploy or install APK automatically.
-- Test Cash Drawer must remain disabled pending electrical compatibility verification and explicit owner approval.
-- Bluetooth print, test-print, and auto-cutter baselines must be preserved.
+- Source snapshot: Android project from private repository branch `feature/test-cash-drawer-20261031`.
+- Only Android build files, Java sources, required app icons/resources, and Cash Drawer source guard are included.
+- No backend, POS frontend, database, backups, release signing key, or SSH credentials.
+- The application loads `https://test-pos.sanrotech.com/` and uses package `com.sanrotech.pos.testing`.
+- Cash Drawer testing is **disabled** in source by `CASH_DRAWER_KICK_ENABLED=false` pending verified electrical compatibility and owner authorization.
+- Auto Cash Drawer is **not enabled**. Do not use this build for live sales.
 
-## State
+## Build
 
-Repository initialized. Android project and build workflow **not yet published**. No APK has been built here.
+GitHub Actions > **Build Android TESTING APK**; triggered by source changes to `main` or manually. The workflow runs source guards and Android debug unit tests, then assembles and inspects the debug APK.
 
-## APK safety
+The artifact contains **app-debug.apk** and signing/identity inspection results. Workflow does **not** deploy, sign with a release key, or install an app.
 
-A debug APK may have a different signing certificate from the existing TESTING app. Verify package ID, signature fingerprint, and version before attempting an update. Never uninstall an existing app just to bypass a signing mismatch.
+## Critical installer warning
+
+Debug APKs built on different GitHub-hosted runners normally have different signing certificates. **Do not uninstall the existing working TESTING APK** to resolve a signing mismatch. Compare signing certificate fingerprint, package ID, and versionCode first. An artifact showing SUCCESS is not evidence that cash drawer hardware works.
+
+## Scope isolation
+
+Nothing in this repository may deploy to LIVE (`pos.sanrotech.com`) or interact with SANRO POS Public (`pos2.sanrotech.com`). Owner Rio must explicitly authorize any device test and any deployment separately.
