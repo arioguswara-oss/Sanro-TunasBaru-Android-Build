@@ -249,7 +249,9 @@ public class MainActivity extends Activity {
     /** Test-only control is injected within the Bluetooth printer section on trusted TESTING settings. */
     private void injectCashDrawerTestButton() {
         if (!isTrustedCashDrawerTestPage()) return;
-        cashDrawerPageToken = UUID.randomUUID().toString();
+        // Repeated onPageFinished for the same document must not rotate the button token.
+        // onPageStarted invalidates it when a full new document starts loading.
+        if (cashDrawerPageToken.isEmpty()) cashDrawerPageToken = UUID.randomUUID().toString();
         final String pageToken = cashDrawerPageToken;
         String js = "(function(){if(document.getElementById('sanroCashDrawerTest'))return;" +
                 "var host=document.getElementById('bluetooth-printer-setting'),anchor=document.getElementById('setting-bt-test');" +
@@ -260,10 +262,14 @@ public class MainActivity extends Activity {
                 "var s=document.createElement('div');s.id='sanroCashDrawerStatus';s.setAttribute('role','status');" +
                 "s.textContent='Drawer-kick NONAKTIF; belum ada pulsa yang dikirim.';" +
                 "s.className='muted';s.style.cssText='margin-top:8px;font-size:12px';" +
+                "var timeout=null;" +
                 "b.addEventListener('click',function(){if(b.disabled)return;b.disabled=true;b.style.opacity='.6';" +
-                "s.textContent='Meminta status test cash drawer…';try{AndroidBridge.testBluetoothCashDrawer('" + pageToken + "');}" +
-                "catch(e){s.textContent='Bridge test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';}});" +
+                "s.textContent='Meminta status test cash drawer…';" +
+                "timeout=setTimeout(function(){timeout=null;s.textContent='Tidak ada respons dari Android. Muat ulang Setting sebelum mencoba lagi. Drawer-kick tetap NONAKTIF.';b.disabled=false;b.style.opacity='1';},6000);" +
+                "try{AndroidBridge.testBluetoothCashDrawer('" + pageToken + "');}" +
+                "catch(e){if(timeout!==null){clearTimeout(timeout);timeout=null;}s.textContent='Bridge test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';}});" +
                 "window.addEventListener('sanro:bluetooth-printer',function(e){var d=e&&e.detail;if(!d||!String(d.type||'').startsWith('drawer-'))return;" +
+                "if(timeout!==null){clearTimeout(timeout);timeout=null;}" +
                 "s.textContent=d.message||'Status test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';});" +
                 "anchor.insertAdjacentElement('afterend',b);host.appendChild(s);})();";
         webView.evaluateJavascript(js, null);
@@ -482,8 +488,11 @@ public class MainActivity extends Activity {
      */
     @SuppressLint("MissingPermission")
     private void sendBluetoothCashDrawerTest(String pageToken) {
-        if (!isTrustedCashDrawerTestPage() || pageToken == null || pageToken.isEmpty()
-                || !pageToken.equals(cashDrawerPageToken)) return;
+        if (!isTrustedCashDrawerTestPage()) return;
+        if (pageToken == null || pageToken.isEmpty() || !pageToken.equals(cashDrawerPageToken)) {
+            printerEvent("drawer-error", "Sesi halaman Setting sudah berubah. Muat ulang halaman lalu coba lagi. Tidak ada pulsa yang dikirim.");
+            return;
+        }
         String jobId = "drawer-test-" + UUID.randomUUID().toString().replace("-", "");
         long now = android.os.SystemClock.elapsedRealtime();
         long previous = lastCashDrawerRequestMs.getAndSet(now);
