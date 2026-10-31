@@ -125,7 +125,12 @@ jobs:
             echo "APK SHA-256: $(sha256sum "$apk" | cut -d ' ' -f 1)"
             echo
             echo "apksigner verification and signer certificate details:"
-            apksigner verify --verbose --print-certs "$apk"
+            apksigner_bin="${ANDROID_HOME}/build-tools/35.0.0/apksigner"
+            if [[ ! -x "$apksigner_bin" ]]; then
+              echo "Android build-tools 35.0.0 apksigner executable is missing." >&2
+              exit 1
+            fi
+            "$apksigner_bin" verify --verbose --print-certs "$apk"
           } | tee "$report_dir/APK-TESTING-INSPECTION.txt"
           echo "report_dir=$report_dir" >> "$GITHUB_OUTPUT"
 
