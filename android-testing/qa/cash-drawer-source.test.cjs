@@ -17,8 +17,14 @@ function methodBody(name, nextMarker) {
   return mainActivity.slice(start, end);
 }
 
-test('cash drawer transmission is explicitly disabled by default', () => {
-  assert.match(mainActivity, /CASH_DRAWER_KICK_ENABLED\s*=\s*false\s*;/);
+test('drawer pulse only enabled in Drawer Lab; ordinary TESTING/release remain disabled', () => {
+  const gradle = fs.readFileSync(path.join(root, 'app/build.gradle'), 'utf8');
+  assert.ok(gradle.includes("buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'false'"));
+  const lab = gradle.split('drawerLab {')[1]?.split(/\n\s*\}/)[0];
+  assert.ok(lab, 'Drawer Lab build type exists');
+  assert.ok(lab.includes("buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'true'"));
+  assert.ok(mainActivity.includes('CASH_DRAWER_KICK_ENABLED = BuildConfig.CASH_DRAWER_KICK_ENABLED'));
+  assert.ok(mainActivity.includes('CASH_DRAWER_REQUEST_COOLDOWN_MS = 30000L'));
   const sender = methodBody('private void sendBluetoothCashDrawerTest(', 'private void drawerTestError(');
   const disabledGate = sender.indexOf('if (!CASH_DRAWER_KICK_ENABLED)');
   const byteConstruction = sender.indexOf('new byte[]{0x1B, 0x70');
@@ -87,9 +93,24 @@ test('token remains stable for repeat onPageFinished and is invalidated by a new
 test('missing native response recovers the Drawer Lab button without automatic retry or sending a pulse', () => {
   const injection = methodBody('private void injectCashDrawerTestButton(', 'private boolean hasBluetoothPermission(');
   assert.match(injection, /timeout=setTimeout\(function\(\)/);
-  assert.match(injection, /,6000\)/);
+  assert.match(injection, /,30000\)/);
   assert.match(injection, /clearTimeout\(timeout\)/);
   assert.match(injection, /Tidak ada respons dari Android/);
   assert.match(injection, /b\.disabled=false/);
+  assert.match(injection, /drawer-confirmation/);
   assert.doesNotMatch(injection, /new byte\[\]|BluetoothJobWriter\.send|setInterval\(/);
+});
+
+test('native manual confirmation precedes the only Drawer Lab drawer pulse', () => {
+  const bridge = mainActivity.slice(mainActivity.indexOf('@JavascriptInterface public void testBluetoothCashDrawer(String pageToken)'));
+  assert.ok(bridge.includes('new AlertDialog.Builder(MainActivity.this)'));
+  assert.ok(bridge.includes('.setPositiveButton("KIRIM 1 PULSA"'));
+  assert.ok(bridge.includes('.setNegativeButton("Batal"'));
+  assert.ok(bridge.includes('.setOnCancelListener('));
+  assert.ok(bridge.includes('sendBluetoothCashDrawerTest(pageToken)'));
+  const sender = methodBody('private void sendBluetoothCashDrawerTest(', 'private void drawerTestError(');
+  assert.ok(sender.includes('new byte[]{0x1B, 0x70, 0x00, 0x19, (byte) 0xFF}'));
+  assert.ok(sender.includes('if (!CASH_DRAWER_KICK_ENABLED)'));
+  assert.ok(sender.includes('BluetoothJobWriter.send(socket.getOutputStream(), kick)'));
+  assert.ok(!mainActivity.slice(mainActivity.indexOf('private void sendBluetoothTestPrint('), mainActivity.indexOf('private void sendBluetoothCashDrawerTest(')).includes('sendBluetoothCashDrawerTest('));
 });

@@ -50,9 +50,19 @@ jobs:
             echo "MainActivity.java is missing from the selected Android project." >&2
             exit 1
           fi
-          if ! grep -Eq 'CASH_DRAWER_KICK_ENABLED[[:space:]]*=[[:space:]]*false[[:space:]]*;' \
+          if ! grep -Fq "CASH_DRAWER_KICK_ENABLED = BuildConfig.CASH_DRAWER_KICK_ENABLED;" \
             "$project_dir/app/src/main/java/com/sanrotech/pos/MainActivity.java"; then
-            echo "Cash drawer must remain disabled for this build workflow." >&2
+            echo "Variant-gated Cash Drawer flag missing." >&2
+            exit 1
+          fi
+          if ! grep -Fq "buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'false'" \
+            "$project_dir/app/build.gradle"; then
+            echo "Default-disabled gate is missing." >&2
+            exit 1
+          fi
+          if ! grep -Fq "buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'true'" \
+            "$project_dir/app/build.gradle"; then
+            echo "Drawer Lab-only opt-in gate is missing." >&2
             exit 1
           fi
 

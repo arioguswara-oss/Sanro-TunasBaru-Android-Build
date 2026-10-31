@@ -77,10 +77,10 @@ public class MainActivity extends Activity {
     private static final String PRINTER_PREFS = "sanro_tunasbaru_printer_local_v1";
     private static final String PREF_DEVICE_ADDRESS = "device_address";
     private static final String PREF_DEVICE_NAME = "device_name";
-    // Owner/hardware gate: keep false until drawer voltage and pinout are verified
-    // and Rio explicitly approves a physical test. No command is sent by default.
-    private static final boolean CASH_DRAWER_KICK_ENABLED = false;
-    private static final long CASH_DRAWER_REQUEST_COOLDOWN_MS = 1200L;
+    // BuildConfig gate: TRUE only in SANRO Drawer Lab; ordinary TESTING and release FALSE.
+    // RJ11 output / cash drawer voltage and pinout remain unverified; physical damage is possible.
+    private static final boolean CASH_DRAWER_KICK_ENABLED = BuildConfig.CASH_DRAWER_KICK_ENABLED;
+    private static final long CASH_DRAWER_REQUEST_COOLDOWN_MS = 30000L;
     private static final UUID SERIAL_PORT_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private WebView webView;
@@ -260,17 +260,19 @@ public class MainActivity extends Activity {
                 "b.textContent='TEST CASH DRAWER';b.setAttribute('aria-label','Test cash drawer via Bluetooth printer');" +
                 "b.className='soft';b.style.cssText='margin-left:8px';" +
                 "var s=document.createElement('div');s.id='sanroCashDrawerStatus';s.setAttribute('role','status');" +
-                "s.textContent='Drawer-kick NONAKTIF; belum ada pulsa yang dikirim.';" +
+                "s.textContent='SANRO Drawer Lab: pembuka laci manual AKTIF. Konfirmasi Android diwajibkan. Risiko tegangan/pinout belum terverifikasi.';" +
                 "s.className='muted';s.style.cssText='margin-top:8px;font-size:12px';" +
                 "var timeout=null;" +
                 "b.addEventListener('click',function(){if(b.disabled)return;b.disabled=true;b.style.opacity='.6';" +
                 "s.textContent='Meminta status test cash drawer…';" +
-                "timeout=setTimeout(function(){timeout=null;s.textContent='Tidak ada respons dari Android. Muat ulang Setting sebelum mencoba lagi. Drawer-kick tetap NONAKTIF.';b.disabled=false;b.style.opacity='1';},6000);" +
+                "timeout=setTimeout(function(){timeout=null;s.textContent='Tidak ada respons dari Android. Periksa kondisi laci dan printer; jangan ulangi otomatis.';b.disabled=false;b.style.opacity='1';},30000);" +
                 "try{AndroidBridge.testBluetoothCashDrawer('" + pageToken + "');}" +
                 "catch(e){if(timeout!==null){clearTimeout(timeout);timeout=null;}s.textContent='Bridge test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';}});" +
                 "window.addEventListener('sanro:bluetooth-printer',function(e){var d=e&&e.detail;if(!d||!String(d.type||'').startsWith('drawer-'))return;" +
                 "if(timeout!==null){clearTimeout(timeout);timeout=null;}" +
-                "s.textContent=d.message||'Status test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';});" +
+                "s.textContent=d.message||'Status test drawer tidak tersedia.';" +
+                "if(d.type==='drawer-confirmation')return;" +
+                "b.disabled=false;b.style.opacity='1';});" +
                 "anchor.insertAdjacentElement('afterend',b);host.appendChild(s);})();";
         webView.evaluateJavascript(js, null);
     }
@@ -528,8 +530,9 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // Candidate only: ESC p m t1 t2. Values are not hardware-verified.
-        // This block is unreachable unless the default-off Owner gate is changed.
+        // One manual ESC p pulse: ON = 0x19 x 2ms = 50ms; OFF = 0xFF x 2ms = 510ms.
+        // Physical PRJ-80BT RJ11 voltage and CD330 pinout/coil still unverified.
+        // The native confirmation and Drawer Lab BuildConfig restrict execution.
         final byte[] kick = new byte[]{0x1B, 0x70, 0x00, 0x19, (byte) 0xFF};
         printerEvent("drawer-sending", "Mengirim satu kandidat perintah drawer-kick; gerakan laci belum terverifikasi.", jobId);
         printWorker.execute(() -> {
@@ -803,7 +806,32 @@ public class MainActivity extends Activity {
         @JavascriptInterface public void selectBluetoothPrinter() { runOnUiThread(() -> choosePrinter()); }
         @JavascriptInterface public void printBluetoothReceipt(String data) { runOnUiThread(() -> sendBluetoothReceipt(data)); }
         @JavascriptInterface public void printBluetoothTest(String jobId) { runOnUiThread(() -> sendBluetoothTestPrint(jobId)); }
-        @JavascriptInterface public void testBluetoothCashDrawer(String pageToken) { runOnUiThread(() -> sendBluetoothCashDrawerTest(pageToken)); }
+        @JavascriptInterface public void testBluetoothCashDrawer(String pageToken) {
+            runOnUiThread(() -> {
+                if (!isTrustedCashDrawerTestPage() || pageToken == null
+                        || !pageToken.equals(cashDrawerPageToken)) {
+                    printerEvent("drawer-error", "Halaman Setting tidak valid. Tidak ada pulsa dikirim.");
+                    return;
+                }
+                if (!CASH_DRAWER_KICK_ENABLED) {
+                    sendBluetoothCashDrawerTest(pageToken);
+                    return;
+                }
+                // Native in-app confirmation. Never activate from sale or Test Print.
+                printerEvent("drawer-confirmation", "Konfirmasi di dialog Android. Belum ada pulsa dikirim.");
+                new AlertDialog.Builder(MainActivity.this)
+                    .setTitle("TEST CASH DRAWER - PERINGATAN")
+                    .setMessage("Output RJ11 printer dan tegangan/pinout laci belum diverifikasi cocok. " +
+                                "Pulsa ini bisa merusak perangkat jika tidak kompatibel. " +
+                                "Kirim SATU pulsa manual tanpa retry?")
+                    .setNegativeButton("Batal", (dialog, which) ->
+                        printerEvent("drawer-cancelled", "Uji dibatalkan. Tidak ada pulsa yang dikirim."))
+                    .setOnCancelListener(dialog ->
+                        printerEvent("drawer-cancelled", "Uji dibatalkan. Tidak ada pulsa yang dikirim."))
+                    .setPositiveButton("KIRIM 1 PULSA", (dialog, which) -> sendBluetoothCashDrawerTest(pageToken))
+                    .show();
+            });
+        }
         @JavascriptInterface public void printPage() { runOnUiThread(() -> { try { PrintManager pm=(PrintManager)getSystemService(Context.PRINT_SERVICE); String name=getString(R.string.app_name)+" - Cetak"; pm.print(name,webView.createPrintDocumentAdapter(name),null); } catch(Exception e) { Toast.makeText(MainActivity.this,"Fitur cetak Android tidak tersedia.",Toast.LENGTH_LONG).show(); } }); }
     }
 }

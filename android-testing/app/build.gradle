@@ -10,6 +10,12 @@ android {
         targetSdk 35
         versionCode 7
         versionName '1.0.7-testing'
+        // Default-disabled for normal TESTING/debug and release builds.
+        buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'false'
+    }
+
+    buildFeatures {
+        buildConfig true
     }
 
     buildTypes {
@@ -18,6 +24,8 @@ android {
             initWith debug
             applicationIdSuffix '.drawerlab'
             versionNameSuffix '-drawerlab'
+            // Owner-approved manual pulse solely in isolated Drawer Lab variant.
+            buildConfigField 'boolean', 'CASH_DRAWER_KICK_ENABLED', 'true'
             matchingFallbacks = ['debug']
         }
         release {
