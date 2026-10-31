@@ -13,6 +13,13 @@ android {
     }
 
     buildTypes {
+        // Drawer Lab gets a separate package; the existing debug variant is unchanged.
+        drawerLab {
+            initWith debug
+            applicationIdSuffix '.drawerlab'
+            versionNameSuffix '-drawerlab'
+            matchingFallbacks = ['debug']
+        }
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'

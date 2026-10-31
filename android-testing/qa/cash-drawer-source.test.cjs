@@ -63,3 +63,15 @@ test('test UI is injected only by the trusted TESTING route and does not use sal
   assert.match(ui, /AndroidBridge\.testBluetoothCashDrawer/);
   assert.doesNotMatch(ui, /printBluetoothReceipt|sendBluetoothReceipt|database|transaction/i);
 });
+
+test('Drawer Lab has its own app ID and launcher title without changing the TESTING base ID', () => {
+  const gradle = fs.readFileSync(path.join(root, 'app/build.gradle'), 'utf8');
+  assert.ok(gradle.includes("applicationId 'com.sanrotech.pos.testing'"));
+  assert.ok(gradle.includes("versionName '1.0.7-testing'"));
+  assert.ok(gradle.includes('drawerLab {'));
+  assert.ok(gradle.includes('initWith debug'));
+  assert.ok(gradle.includes("applicationIdSuffix '.drawerlab'"));
+  assert.ok(gradle.includes("versionNameSuffix '-drawerlab'"));
+  const strings = fs.readFileSync(path.join(root, 'app/src/drawerLab/res/values/strings.xml'), 'utf8');
+  assert.ok(strings.includes('<string name="app_name">SANRO Drawer Lab</string>'));
+});
