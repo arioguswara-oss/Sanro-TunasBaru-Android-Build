@@ -243,27 +243,29 @@ public class MainActivity extends Activity {
     private boolean isTrustedCashDrawerTestPage() {
         if (webView == null) return false;
         Uri uri = Uri.parse(webView.getUrl() == null ? "" : webView.getUrl());
-        return isTrustedWebOrigin(uri) && "/sanro-test-setting.html".equals(uri.getPath());
+        return isTrustedWebOrigin(uri) && ("/setting.html".equals(uri.getPath()) || "/sanro-test-setting.html".equals(uri.getPath()));
     }
 
-    /** Test-only control is injected on the dedicated TESTING settings route. */
+    /** Test-only control is injected within the Bluetooth printer section on trusted TESTING settings. */
     private void injectCashDrawerTestButton() {
         if (!isTrustedCashDrawerTestPage()) return;
         cashDrawerPageToken = UUID.randomUUID().toString();
         final String pageToken = cashDrawerPageToken;
         String js = "(function(){if(document.getElementById('sanroCashDrawerTest'))return;" +
+                "var host=document.getElementById('bluetooth-printer-setting'),anchor=document.getElementById('setting-bt-test');" +
+                "if(!host||!anchor||!host.contains(anchor))return;" +
                 "var b=document.createElement('button');b.id='sanroCashDrawerTest';b.type='button';" +
                 "b.textContent='TEST CASH DRAWER';b.setAttribute('aria-label','Test cash drawer via Bluetooth printer');" +
-                "b.style.cssText='position:fixed;right:16px;bottom:16px;z-index:2147483000;padding:14px 18px;border:0;border-radius:8px;background:#6b7280;color:#fff;font-weight:700;box-shadow:0 3px 12px #0005';" +
+                "b.className='soft';b.style.cssText='margin-left:8px';" +
                 "var s=document.createElement('div');s.id='sanroCashDrawerStatus';s.setAttribute('role','status');" +
                 "s.textContent='Drawer-kick NONAKTIF; belum ada pulsa yang dikirim.';" +
-                "s.style.cssText='position:fixed;right:16px;bottom:72px;z-index:2147483000;padding:8px 10px;background:#fff;color:#111;border:1px solid #9ca3af;border-radius:6px;font-size:12px';" +
+                "s.className='muted';s.style.cssText='margin-top:8px;font-size:12px';" +
                 "b.addEventListener('click',function(){if(b.disabled)return;b.disabled=true;b.style.opacity='.6';" +
                 "s.textContent='Meminta status test cash drawer…';try{AndroidBridge.testBluetoothCashDrawer('" + pageToken + "');}" +
                 "catch(e){s.textContent='Bridge test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';}});" +
                 "window.addEventListener('sanro:bluetooth-printer',function(e){var d=e&&e.detail;if(!d||!String(d.type||'').startsWith('drawer-'))return;" +
                 "s.textContent=d.message||'Status test drawer tidak tersedia.';b.disabled=false;b.style.opacity='1';});" +
-                "document.body.appendChild(b);document.body.appendChild(s);})();";
+                "anchor.insertAdjacentElement('afterend',b);host.appendChild(s);})();";
         webView.evaluateJavascript(js, null);
     }
 

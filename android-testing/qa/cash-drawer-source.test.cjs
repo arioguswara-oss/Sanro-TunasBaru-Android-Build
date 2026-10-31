@@ -28,8 +28,11 @@ test('cash drawer transmission is explicitly disabled by default', () => {
   assert.match(sender, /drawer-disabled/);
 });
 
-test('bridge requires the dedicated TESTING page and its per-page token', () => {
-  assert.match(mainActivity, /"\/sanro-test-setting\.html"\.equals\(uri\.getPath\(\)\)/);
+test('bridge requires the trusted TESTING settings page and its per-page token', () => {
+  const route = methodBody('private boolean isTrustedCashDrawerTestPage(', '/** Test-only control is injected');
+  assert.match(route, /isTrustedWebOrigin\(uri\)/);
+  assert.match(route, /"\/setting\.html"\.equals\(uri\.getPath\(\)\)/);
+  assert.match(route, /"\/sanro-test-setting\.html"\.equals\(uri\.getPath\(\)\)/);
   const sender = methodBody('private void sendBluetoothCashDrawerTest(', 'private void drawerTestError(');
   assert.match(sender, /if \(!isTrustedCashDrawerTestPage\(\).*pageToken == null/s);
   assert.match(sender, /!pageToken\.equals\(cashDrawerPageToken\)/);
@@ -52,6 +55,11 @@ test('test UI is injected only by the trusted TESTING route and does not use sal
   const ui = methodBody('private void injectCashDrawerTestButton(', 'private boolean hasBluetoothPermission(');
   assert.match(ui, /if \(!isTrustedCashDrawerTestPage\(\)\) return/);
   assert.match(ui, /TEST CASH DRAWER/);
+  assert.match(ui, /getElementById\('bluetooth-printer-setting'\)/);
+  assert.match(ui, /getElementById\('setting-bt-test'\)/);
+  assert.match(ui, /host\.contains\(anchor\)/);
+  assert.match(ui, /anchor\.insertAdjacentElement\('afterend',b\)/);
+  assert.doesNotMatch(ui, /position:fixed|document\.body\.appendChild/);
   assert.match(ui, /AndroidBridge\.testBluetoothCashDrawer/);
   assert.doesNotMatch(ui, /printBluetoothReceipt|sendBluetoothReceipt|database|transaction/i);
 });
