@@ -1,0 +1,23 @@
+name: Public Runner Smoke Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/public-runner-smoke.yml
+
+permissions:
+  contents: read
+
+jobs:
+  verify-public-runner:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Confirm public GitHub runner availability
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "PUBLIC_RUNNER_HEALTH_OK"
+          echo "No private source, signing key, APK, deployment, or device operations."
